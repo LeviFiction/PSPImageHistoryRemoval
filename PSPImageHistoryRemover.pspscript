@@ -42,7 +42,7 @@ def Do(Environment):
             r = getParts(Environment, f, result[1]) #send reference to beginning of block and file
             if r != -1: #if a result is returned
                 historyFieldStart, historyFieldLength = r
-                getHistoryStartEnd(Environment, f, r[0], r[1])
+                historydataStart, historyDataEnd = getHistoryStartEnd(Environment, f, r[0], r[1])
                 break #break out of o loop
             f.seek(offset+result[1]+10) #jump to end of block and keep going there was no history
             
@@ -62,24 +62,23 @@ def Do(Environment):
     msgBox(Environment, 'Copy successfull:' + newfilename, icon=App.Constants.MsgIcons.Info)
 
 def getHistoryStartEnd(Environment, f, offset, length):
-    print('fieldstart', offset)
-    print('fieldlength', length)
     f.seek(offset+10) #Goes to the beginning of the field data
-    print(f.tell(), offset+10)
     counter = offset+10
     while f.read(19) != b"<photoshop:History>" and counter <= (offset + length):
-        #f.seek(counter)
-        #print(f.read(13))
         counter += 1
         f.seek(counter)
-    print("Start is ", counter)
-    counter += 13
+    if counter >= (offset + length):
+        return -1
+    start_of_data = counter
+    counter += 13 #jump to part way through just because
     f.seek(counter)
     while f.read(20) != b"</photoshop:History>" and counter <= (offset + length):  
         counter += 1
         f.seek(counter)
+    if count >= (offset + length): #No ending tag found
+        return -1
+    return start_of_data, counter
         
-    print("End is " , counter)
     
 def getParts(Environment, f, offset): #Takes open file reference and offset of the dataBlock
     f.seek(offset) #Goes to beginning of the block
