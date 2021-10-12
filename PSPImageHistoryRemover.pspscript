@@ -1,0 +1,126 @@
+from JascApp import *
+import struct
+import os
+
+def ScriptProperties():
+    return {
+        'Author': u'LeviFiciton',
+        'Copyright': u'2018',
+        'Description': u'This script makes a copy of the current PSPImage file and removes its history',
+        'Host': u'PaintShop Pro',
+        'Host Version': u'9.00'
+        }
+
+def Do(Environment):
+    if len(App.Documents) < 1:
+        return #No images open to remove history from
+    filename = App.TargetDocument.Name
+    dataBlockStart = 0
+    dataBlockLength =  0
+    historyFieldStart = 0
+    historyFieldLength = 0
+    newDataBlockLength = 0
+
+    if filename == None:
+        print "This file is new and hasn't been saved yet"
+        return
+
+    f = open(filename, 'rb') #Open file
+    if 'Paint Shop Pro Image File\n\x1a\x00\x00\x00\x00\x00' != f.read(32): #is this a Paintshop pro file
+        msgBox(Environment, 'Not a valid PSPImage file')
+        #print "Not a valid PSPImage file"
+        return #End function
+    major,minor = struct.unpack("<HH", f.read(4)) #get major and minor version, not really important except to move along
+    while 1: #Loop until we break out
+        result = getBlock(Environment, f) #Get next block
+        if result == -1: #If result is -1 exit the function
+            return
+        if result[0] == 10: #If block is 10 - PSP_EXTENDED_DATA_BLOCK start looking for fields
+            dataBlockStart = result[1]
+            dataBlockLength = result[2]
+            offset = f.tell() #Grab current location
+            r = getParts(Environment, f, result[1]) #send reference to beginning of block and file
+            if r != -1: #if a result is returned
+                historyFieldStart, historyFieldLength = r
+                getHistoryStartEnd(Environment, f, r[0], r[1])
+                break #break out of o loop
+            f.seek(offset+result[1]+10) #jump to end of block and keep going there was no history
+            
+    path, extension = os.path.splitext(filename)
+    newfilename = path + "-NoHistory" + extension
+    f2 = open(newfilename,'wb')
+    f.seek(0) #go back to beginning of the file
+    f2.write(f.read(dataBlockStart + 6)) #Copy up to the startng point of our data block
+    newDataBlockLength = dataBlockLength - historyFieldLength #Calculate new block length
+    f2.write(struct.pack("<I", newDataBlockLength)) #write new length
+    f.seek(f.tell() + 4)
+    f2.write(f.read(historyFieldStart - f.tell())) #Copy up to the beginning of the history field      
+    f.seek(f.tell()  + historyFieldLength) #Skip ahead ignoring history field
+    f2.write(f.read()) #Copy the rest of the file
+    f2.close() #Close new file
+    f.close() #close old file
+    msgBox(Environment, 'Copy successfull:' + newfilename, icon=App.Constants.MsgIcons.Info)
+
+def getHistoryStartEnd(Environment, f, offset, length):
+    print('fieldstart', offset)
+    print('fieldlength', length)
+    f.seek(offset+10) #Goes to the beginning of the field data
+    print(f.tell(), offset+10)
+    counter = offset+10
+    while f.read(19) != b"<photoshop:History>" and counter <= (offset + length):
+        #f.seek(counter)
+        #print(f.read(13))
+        counter += 1
+        f.seek(counter)
+    print("Start is ", counter)
+    counter += 13
+    f.seek(counter)
+    while f.read(20) != b"</photoshop:History>" and counter <= (offset + length):  
+        counter += 1
+        f.seek(counter)
+        
+    print("End is " , counter)
+    
+def getParts(Environment, f, offset): #Takes open file reference and offset of the dataBlock
+    f.seek(offset) #Goes to beginning of the block
+    if f.read(4) != '~BK\x00': #Checks to make sure we are at the beginning
+        msgBox(Environment, 'Error reading block from file')
+        return -1 #If not return an error code
+    f.read(2) #Skip block type we'll assume it's block 10
+    length = struct.unpack("<I", f.read(4)) #Get total length of field
+    while (f.tell()-offset) < length[0]:
+        if f.read(4) != '~FL\x00':
+            msgBox(Environment, 'Error reading Field from file')
+            print "NOt the beginning of a field"
+            return -1
+        ft = struct.unpack("<H", f.read(2))
+        fl = struct.unpack("<I", f.read(4))
+        if ft[0] == 5:
+            return (f.tell()-10), (fl[0] + 10)
+        f.seek(f.tell() + fl[0])
+    return -1
+
+def getBlock(Environment, f): #Return information on the next block and fast forward past it
+    offset = f.tell() #Grab current location in the file
+    if f.read(4) != '~BK\x00': #Is this a block?
+        f.seek(offset) #If not go back to the stating point
+        if f.read(4) != "": #Did we reach the end?
+            msgBox(Environment, 'Error reading file')
+            f.seek(offset)
+            print f.read(4)
+            print "Not a valid block"
+        return -1 #Return with a failed error code
+
+    blockType = struct.unpack("<H", f.read(2)) #Get block type
+    blockSize = struct.unpack("<I", f.read(4)) #Get block length in bytes
+
+    f.seek(f.tell() + blockSize[0]) #We are past the header, so just add current location to the length to jump ahead
+    return blockType[0], offset, blockSize[0] #Return the block type and the offset that represents the start of the block with header
+
+def msgBox(Environment, text, icon=App.Constants.MsgIcons.Stop):
+    result = App.Do(Environment,  'MsgBox', {
+            'Buttons': App.Constants.MsgButtons.OKCancel, 
+            'Icon': icon, 
+            'Text': text,
+            })
+    return result
