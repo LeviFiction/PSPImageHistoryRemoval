@@ -1,7 +1,7 @@
 # PSPImageHistoryRemoval
 A short script to remove the history from a PSPImage file.  
 
-# Purpose
+## Purpose
 Corel introduced saving editing history into the PSPImage file and JPG files.  Every edit you make is saved to the file.  This introduces several problems.
 * If you ever passive-agressively wrote something into the file, ti's incldued
 * It includes paths to files that were used in the creation of the image and so hints at your folder structure
