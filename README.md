@@ -10,8 +10,7 @@ Corel introduced saving editing history into the PSPImage file and JPG files.  E
 * Sometimes the history can be larger than the actual image.  With some people reporting history sizes of over 300MB.
 
 ## Issues with current script
-History and EXIF data are both stored in the Extended Data block (10) with the field array (05), currently the script fully removes this field array which destroys EXIF along with the history.  
+Not widely tested - the new version has only been tested on a small examples.
 
 ## TODO:
-* Remove only the <photoshop:History> element and child data.  Leaving the rest of file array (05) intact.
 * Export the XML data to a separate history file for preservation if required.
