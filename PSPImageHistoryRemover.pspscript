@@ -29,38 +29,38 @@ def Do(Environment):
         return
 
     original_file = open(filename, 'rb') #Open file
-    
+
     # Is this a Paintshop pro file
     if 'Paint Shop Pro Image File\n\x1a\x00\x00\x00\x00\x00' != original_file.read(32):
         msgBox(Environment, 'Not a valid PSPImage file')
         return #End function
-    
+
     #get major and minor version, not really important except to move along
-    major,minor = struct.unpack("<HH", original_file.read(4)) 
+    major,minor = struct.unpack("<HH", original_file.read(4))
 
     # Loop until we break out
-    while 1: 
+    while 1:
         # Get next block
         block_result = getBlock(Environment, original_file)
 
         # If result is -1 exit the function
-        if block_result == -1: 
+        if block_result == -1:
             return
 
         # If block is 10 - PSP_EXTENDED_DATA_BLOCK start looking for fields
-        if block_result[0] == 10: 
+        if block_result[0] == 10:
             data_block_start = block_result[1]
             data_block_length = block_result[2]
             # Grab current location
             offset = original_file.tell()
             # Send reference to beginning of block and file
-            field_result = getParts(Environment, original_file, block_result[1]) 
+            field_result = getParts(Environment, original_file, block_result[1])
 
             # If a result is returned
-            if field_result != -1: 
+            if field_result != -1:
                 history_field_start, history_field_length = field_result
-                history_location = get_history_start_and_length(original_file, 
-                                                      field_result[0], 
+                history_location = get_history_start_and_length(original_file,
+                                                      field_result[0],
                                                       field_result[1])
                 if history_location != -1:
                     history_data_start, history_data_length = history_location
@@ -71,7 +71,7 @@ def Do(Environment):
                 break # Break out of loop
             # Jump to end of block and keep going there was no history
             original_file.seek(offset+block_result[1]+10)
-    
+
     # Calculate new block length
     new_data_block_length = data_block_length - history_data_length
     new_field_length = history_field_length - history_data_length - 10
@@ -81,14 +81,14 @@ def Do(Environment):
     new_file = open(newfilename,'wb')
 
     # Go back to beginning of the file
-    original_file.seek(0) 
+    original_file.seek(0)
 
     # Copy up to the startng point of our data block length value
     new_file.write(original_file.read(data_block_start + 6))
     # Write new length
     new_file.write(struct.pack("<I", new_data_block_length))
     # Jump over original length
-    original_file.read(4) 
+    original_file.read(4)
     # Copy up to the field length
     new_file.write(original_file.read((history_field_start + 6) - original_file.tell()))
     # Update field length
@@ -99,7 +99,7 @@ def Do(Environment):
     new_file.write(original_file.read(history_data_start - original_file.tell()))
     # Skip over history data
     original_file.read(history_data_length)
-    # Copy up to the beginning of the history field  
+    # Copy up to the beginning of the history field
     # Tag start - field start + 6 = how much we've read.
     # New length - read already = how much more to read
     data_left_to_read = new_field_length - (history_data_start - (history_field_start))
@@ -107,15 +107,15 @@ def Do(Environment):
     # Copy the rest of the file
     new_file.write(original_file.read())
     # Close new file
-    new_file.close() 
+    new_file.close()
     # Close old file
-    original_file.close() 
+    original_file.close()
     msgBox(Environment, 'Copy successfull:' + newfilename, icon=App.Constants.MsgIcons.Info)
 
 def get_history_start_and_length(file_obj, offset, length):
     """Finds the starting point of the history section and it's length"""
     # Goes to the beginning of the field data
-    file_obj.seek(offset+10) 
+    file_obj.seek(offset+10)
     counter = offset+10
     while file_obj.read(19) != b"<photoshop:History>" and counter <= (offset + length):
         counter += 1
@@ -125,28 +125,27 @@ def get_history_start_and_length(file_obj, offset, length):
     start_of_data = counter
     counter += 13 # Jump to part way through just because
     file_obj.seek(counter)
-    while file_obj.read(20) != b"</photoshop:History>" and counter <= (offset + length):  
+    while file_obj.read(20) != b"</photoshop:History>" and counter <= (offset + length):
         counter += 1
         file_obj.seek(counter)
     if counter >= (offset + length): # No ending tag found
         return -1
     # Total length is the end point + 20 (for the length of the tag) minus the start.
     return start_of_data, (counter - start_of_data)+20
-        
-    
+
 def getParts(Environment, file_obj, offset):
     """Returns the field start and length if it exists"""
     # Goes to beginning of the block
     file_obj.seek(offset)
     # Checks to make sure we are at the beginning
-    if file_obj.read(4) != '~BK\x00': 
+    if file_obj.read(4) != '~BK\x00':
         msgBox(Environment, 'Error reading block from file')
         return -1 #If not return an error code
     # Skip block type we'll assume it's block 10
     file_obj.read(2)
     # Get total length of block to know when we've reached the end
     length = struct.unpack("<I", file_obj.read(4))
-    # Loop over fields until end of block 
+    # Loop over fields until end of block
     while (file_obj.tell()-offset) < length[0]:
         # Couldn't find field - this is bad
         if file_obj.read(4) != '~FL\x00':
@@ -167,7 +166,7 @@ def getParts(Environment, file_obj, offset):
 def getBlock(Environment, file_obj):
     """Returns type, start and length of a block if any"""
     # Grab current location in the file
-    offset = file_obj.tell() 
+    offset = file_obj.tell()
     # Is this a block?
     if file_obj.read(4) != '~BK\x00':
         # If not go back to the stating point
@@ -181,18 +180,18 @@ def getBlock(Environment, file_obj):
             print("Not a valid block")
         return -1
     # Get block type and length
-    block_type = struct.unpack("<H", file_obj.read(2)) 
+    block_type = struct.unpack("<H", file_obj.read(2))
     block_size = struct.unpack("<I", file_obj.read(4))
     # We are past the header, so just add current location to the length to jump ahead
     file_obj.seek(file_obj.tell() + block_size[0])
-    # Return the block type and the offset that represents the start of the block with header 
-    return block_type[0], offset, block_size[0] 
+    # Return the block type and the offset that represents the start of the block with header
+    return block_type[0], offset, block_size[0]
 
 def msgBox(Environment, text, icon=App.Constants.MsgIcons.Stop):
     """Provides a quick MessageBox to the user"""
     result = App.Do(Environment,  'MsgBox', {
-            'Buttons': App.Constants.MsgButtons.OKCancel, 
-            'Icon': icon, 
+            'Buttons': App.Constants.MsgButtons.OKCancel,
+            'Icon': icon,
             'Text': text,
             })
     return result
