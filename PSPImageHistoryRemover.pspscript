@@ -9,7 +9,7 @@ def ScriptProperties():
     return {
         'Author': u'LeviFiciton',
         'Copyright': u'2018',
-        'Description': u'This script makes a copy of the current PSPImage file and removes its history',
+        'Description': u'This script makes a copy of the current PSPImage file and removes its history v1.2',
         'Host': u'PaintShop Pro',
         'Host Version': u'9.00'
         }
