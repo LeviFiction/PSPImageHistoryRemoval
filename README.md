@@ -9,6 +9,11 @@ Corel introduced saving editing history into the PSPImage file and JPG files.  E
 * If you use brushes or vectors this adds tons of text to the history
 * Sometimes the history can be larger than the actual image.  With some people reporting history sizes of over 300MB.
 
+## Versions
+* 1.0 - Initial release removed the entire Extended Data Block
+* 1.1 - Removes only the <photoshop:History> through </photoshop:History> and leaves the rest of the block alone
+* 1.2 - Speeds up history removal by switching how I it finds the ending tag
+
 ## Issues with current script
 Not widely tested - the new version has only been tested on a small examples.
 
