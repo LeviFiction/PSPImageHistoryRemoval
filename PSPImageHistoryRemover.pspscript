@@ -1,6 +1,9 @@
 from JascApp import *
 import struct
 import os
+import time
+from Tkinter import Tk # type:ignore
+import tkFileDialog # type:ignore
 
 def ScriptProperties():
     return {
@@ -12,9 +15,30 @@ def ScriptProperties():
         }
 
 def Do(Environment):
-    if len(App.Documents) < 1:
-        return #No images open to remove history from
-    filename = App.TargetDocument.Name
+    # if len(App.Documents) < 1:
+    #     return #No images open to remove history from
+    # Grab Filename
+    result = False
+    if len(App.Documents) >= 1:
+         result = msgBox(Environment, "Do you want to remove history from the current file?", 2, 2)
+    if not result:
+        root = Tk()
+        root.withdraw()
+        filenames = tkFileDialog.askopenfilenames(initialdir = "%userprofile%\\Pictures", title = "Select PSPImage file",filetypes = (("PSPImage Files","*.pspimage"),))
+        root.destroy()
+        if filenames == ('',):
+            return
+    else:
+        filenames = [App.ActiveDocument.Name]
+
+    for filename in filenames:
+        newfilename = remove_history(Environment, filename)
+        if newfilename and os.path.isfile(newfilename):
+            file_open(Environment, newfilename)
+
+def remove_history(Environment, filename):
+    # filename = App.TargetDocument.Name
+    # filename = filenames[0]
     data_block_start = 0
     data_block_length =  0
     history_field_start = 0
@@ -59,9 +83,11 @@ def Do(Environment):
             # If a result is returned
             if field_result != -1:
                 history_field_start, history_field_length = field_result
+                start_time = time.time()
                 history_location = get_history_start_and_length(original_file,
                                                       field_result[0],
                                                       field_result[1])
+                end_time = time.time()
                 if history_location != -1:
                     history_data_start, history_data_length = history_location
                 else:
@@ -110,7 +136,8 @@ def Do(Environment):
     new_file.close()
     # Close old file
     original_file.close()
-    msgBox(Environment, 'Copy successfull:' + newfilename, icon=App.Constants.MsgIcons.Info)
+    msgBox(Environment, 'Copy successfull:' + newfilename + "\n Total Time: " + str(end_time - start_time), icon=1, buttons=0)
+    return newfilename
 
 def get_history_start_and_length(file_obj, offset, length):
     """Finds the starting point of the history section and it's length"""
@@ -123,12 +150,17 @@ def get_history_start_and_length(file_obj, offset, length):
     if counter >= (offset + length):
         return -1
     start_of_data = counter
-    counter += 13 # Jump to part way through just because
+    
+    # Consider jumping to end of the section and work backwards.
+    # If we get to start_of_data return -1
+    # If this works, it should be faster than going through the data 1 byte at a time
+
+    counter += (offset + length)-20 # Jump to end minus 20
     file_obj.seek(counter)
-    while file_obj.read(20) != b"</photoshop:History>" and counter <= (offset + length):
-        counter += 1
+    while file_obj.read(20) != b"</photoshop:History>" and counter >= (start_of_data):
+        counter -= 1
         file_obj.seek(counter)
-    if counter >= (offset + length): # No ending tag found
+    if counter <= (start_of_data): # No ending tag found
         return -1
     # Total length is the end point + 20 (for the length of the tag) minus the start.
     return start_of_data, (counter - start_of_data)+20
@@ -187,11 +219,37 @@ def getBlock(Environment, file_obj):
     # Return the block type and the offset that represents the start of the block with header
     return block_type[0], offset, block_size[0]
 
-def msgBox(Environment, text, icon=App.Constants.MsgIcons.Stop):
+def msgBox(Environment, text, icon=0, buttons=1):
     """Provides a quick MessageBox to the user"""
     result = App.Do(Environment,  'MsgBox', {
-            'Buttons': App.Constants.MsgButtons.OKCancel,
+            'Buttons': buttons,
             'Icon': icon,
             'Text': text,
             })
     return result
+
+def file_open(Environment, filename):
+    folder,_ = os.path.split(filename)
+    App.Do( Environment, 'FileOpen', {
+        'FileList': [filename], 
+        'Folder': folder, 
+        'FileFormat': App.Constants.FileFormat.Unknown, 
+        'ShowPreview': True, 
+        'EnableBrowser': True, 
+        'FavFileList': [], 
+        'RawCameraSettings': {
+            'WhiteBalance': App.Constants.WhiteBalance.AsShot, 
+            'SharpenMode': App.Constants.SharpenMode.Low, 
+            'Exposure': 0, 
+            'Rect': ((0,0), 0, 0), 
+            'ShowMaximized': False, 
+            'ShowPreview': True
+            }, 
+        'FileOpenScript': u'', 
+        'EnablePreprocessing': False, 
+        'GeneralSettings': {
+            'ExecutionMode': App.Constants.ExecutionMode.Default, 
+            'AutoActionMode': App.Constants.AutoActionMode.Match, 
+            'Version': ((25,0,0),1)
+            }
+        })
