@@ -27,13 +27,18 @@ def Do(Environment):
         filenames = tkFileDialog.askopenfilenames(initialdir = "%userprofile%\\Pictures", title = "Select PSPImage file",filetypes = (("PSPImage Files","*.pspimage"),))
         root.destroy()
         if filenames == ('',):
+            msgBox(Environment, "No Files selected")
             return
     else:
         filenames = [App.ActiveDocument.Name]
-
+    print("Found", len(filenames), "files, processing them now")
     for filename in filenames:
+        print("Processing: ", filename)
         newfilename = remove_history(Environment, filename)
+        if not newfilename:
+          print("Couldn't find new file", newfilename)
         if newfilename and os.path.isfile(newfilename):
+            print("Opening: ", newfilename)
             file_open(Environment, newfilename)
 
 def remove_history(Environment, filename):
